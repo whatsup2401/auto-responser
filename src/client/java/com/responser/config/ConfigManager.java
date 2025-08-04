@@ -41,6 +41,10 @@ public class ConfigManager {
         map.put("autoOutputMentions", true);
         map.put("sendDelay", 4000);
         map.put("delayRandomFactor", 500);
+        map.put("randomResponses", false);
+        map.put("delayS", 3);                     
+        map.put("delayRandomFactor", 500);
+        map.put("autoOutputMentions", true);
         return map;
     }
 
