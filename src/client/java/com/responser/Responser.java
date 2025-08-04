@@ -107,12 +107,31 @@ public class Responser implements ClientModInitializer {
 
         resetFlags();
 
+        // --- Delay in seconds + jitter (milliseconds) ---
+        int baseSec = ((Number) cfg.get("delayS")).intValue();
+        int randMs = ((Number) cfg.get("delayRandomFactor")).intValue();
+        long baseMs = Math.max(0, baseSec) * 1000L;
+        long minMs = Math.max(1, baseMs - randMs);
+        long maxMs = baseMs + randMs;
+        long delayMs = randMs > 0 ? ThreadLocalRandom.current().nextLong(minMs, maxMs + 1) : baseMs;
+
         scheduledTask = scheduler.schedule(() -> {
             if (!cancelTask) {
+                // --- Optional random short responses ---
+                if ((Boolean) cfg.get("randomResponses")) {
+                    String[] pool = { "Yes.", "No.", "Maybe.", "Alright.", "Sure." };
+                    String randomReply = pool[ThreadLocalRandom.current().nextInt(pool.length)];
+                    String out = prefix + randomReply;
+
+                    client.execute(() -> client.getNetworkHandler().sendChatMessage(out));
+                    resetFlags();
+                    return;
+                }
+
                 client.execute(() -> response(senderName, text, prefix, client, cfg));
             }
             resetFlags();
-        }, ((Number) cfg.get("delayS")).longValue(), TimeUnit.SECONDS);
+        }, delayMs, TimeUnit.MILLISECONDS);
     }
 
     private void resetFlags() {
@@ -173,10 +192,13 @@ public class Responser implements ClientModInitializer {
         }
 
         if (cleanedText != null) {
-            if ((Boolean) cfg.get("autoOutputMentions")) {
-                prefix = senderName + ", ";
-            } else {
-                prefix = "";
+            // Apply outgoing name prefix for public outputs only (do not override private /tell)
+            if (!prefix.startsWith("/")) {
+                if ((Boolean) cfg.get("autoOutputMentions")) {
+                    prefix = senderName + ", ";
+                } else {
+                    prefix = "";
+                }
             }
             // existing: show notification + schedule
             Notification.showNotification(
